@@ -2,6 +2,7 @@ library(shiny.semantic)
 library(geosphere)
 library(leaflet)
 library(data.table)
+library(dplyr)
 source("utils.R")
 
 shinyServer(function(input, output, session) {
@@ -9,57 +10,56 @@ shinyServer(function(input, output, session) {
   withProgress({
     # Read data
     ships <- data.table::fread("ships.csv", sep = ",")
-    ships <- ships[order(SHIP_ID, DATETIME)]
-    # Calculate distance between observations
-    ships <- ships[, `:=`(
-      LAT_prev = data.table::shift(LAT, n = 1, type = "lag"),
-      LON_prev = data.table::shift(LON, n = 1, type = "lag"),
-      DATETIME_prev = data.table::shift(DATETIME, n = 1, type = "lag")),
-      by = "SHIP_ID"]
-    ships <- ships[,DISTANCE := dt_haversine(LAT_prev, LON_prev, LAT, LON)]
-    # Select observation with longest distance
-    ships_longest_dist <- ships[order(-DISTANCE, -DATETIME), .SD[1], by = "SHIP_ID"]
-  }, message = "Loading data")
+  }, message = "Loading data", value = 0.5)
   
   # Inputs
-  ship_types <- reactive({
-    sort(as.character(unique(ships$ship_type)))
-  })
+  ship_types <- reactive({sort(as.character(unique(ships$ship_type)))})
   
   ship_names <- reactive({
-    ships_longest_dist %>% 
+    ships %>% 
       filter(ship_type == input$shiptype) %>% 
-      pull(SHIPNAME) %>%
+      pull(SHIPNAME) %>% 
+      unique(.) %>%
       sort(.)
   })
   
-  observe({
-    updateSelectInput(session, "shiptype", choices = ship_types())
-  })
+  observe({updateSelectInput(session, "shiptype", choices = ship_types())})
+  observe({updateSelectInput(session, "shipname", choices = ship_names())})
   
-  observe({
-    updateSelectInput(session, "shipname", choices = ship_names())
-  })
-  
-  
-  selected_ship <- reactive({
-    ships_longest_dist %>% 
-      filter(SHIPNAME == input$shipname) %>%
-      mutate(LABEL = HTML(glue::glue("Ship Name: {SHIPNAME} <br>
+  # Calculate longest distance by ship
+  ship_statistics <- reactive({
+    withProgress({
+      ship_distance <- ships[SHIPNAME == input$shipname][order(DATETIME)]
+      ship_distance <- ship_distance[, `:=`(
+        LAT_prev = data.table::shift(LAT, n = 1, type = "lag"),
+        LON_prev = data.table::shift(LON, n = 1, type = "lag"),
+        DATETIME_prev = data.table::shift(DATETIME, n = 1, type = "lag"))]
+      # Calculate distance between observations
+      ship_distance <- ship_distance[,DISTANCE := dt_haversine(LAT_prev, LON_prev, LAT, LON)]
+      total_distance <- ship_distance[, .(total_distance = sum(DISTANCE, na.rm = TRUE)),
+                                      by = "date"]
+      
+      # Select observation with longest distance
+      longest_distance <- ship_distance[order(-DISTANCE, -DATETIME), .SD[1]]
+      # Add labels for Leaflet
+      longest_distance <- longest_distance %>%
+        mutate(LABEL = HTML(glue::glue("Ship Name: {SHIPNAME} <br>
                                  Lat: {LAT} <br>
-                                 Lon:{LON}) <br>
+                                 Lon: {LON}) <br>
                                  Date: {DATETIME}"))) %>%
-      mutate(LABEL_prev = HTML(glue::glue("Ship Name: {SHIPNAME} <br>
+        mutate(LABEL_prev = HTML(glue::glue("Ship Name: {SHIPNAME} <br>
                                  Lat: {LAT_prev} <br>
-                                 Lon:{LON_prev}) <br>
+                                 Lon: {LON_prev}) <br>
                                  Date: {DATETIME_prev}")))
+      list(longest_distance, total_distance)
+    }, message = "Processing ...")
   })
   
   # Map
   output$map <- renderLeaflet({
     leaflet() %>% 
       addTiles() %>%
-      addCircleMarkers(data = selected_ship(), 
+      addCircleMarkers(data = ship_statistics()[[1]], 
                        lat = ~LAT,
                        lng = ~ LON, 
                        label  =  ~LABEL,
@@ -68,7 +68,7 @@ shinyServer(function(input, output, session) {
                        color = "green",
                        clusterOptions = markerClusterOptions()
       ) %>%
-      addCircleMarkers(data = selected_ship(), 
+      addCircleMarkers(data = ship_statistics()[[1]], 
                        lat = ~LAT_prev,
                        lng = ~ LON_prev, 
                        label  =  ~LABEL_prev,
@@ -79,19 +79,31 @@ shinyServer(function(input, output, session) {
       )
   })
   
-  # Text output
-  
+  # Card content
   output$card_content <-  renderText(
-    selected_ship() %>% 
+    ship_statistics()[[1]] %>% 
       mutate(card_content = glue::glue(
-        "Ship Name: {SHIPNAME} <br>
+        "Ship name: {SHIPNAME} <br>
+        ID: {SHIP_ID} <br>
+        Flag: {FLAG} <i class='{tolower(FLAG)} flag'></i> <br>
+        Ship type: {ship_type} <br>
         Lat: {LAT} <br>
-        Lon:{LON}) <br>
-        Date: {DATETIME}")) %>% 
-      pull(card_content) %>% print(.)
+        Lon: {LON}) <br>
+        Date: {date}")) %>% 
+      pull(card_content)
   )
+  
   # Statistic
-  output$distance <- renderText(round(selected_ship()$DISTANCE, 1))
+  output$distance <- renderText(round(ship_statistics()[[1]]$DISTANCE, 1))
+  
+  # Graph
+  output$chart <- plotly::renderPlotly({
+    fig <- ship_statistics()[[2]] %>% 
+      plotly::plot_ly(x = ~date, y = ~total_distance/1000, type = 'bar', color = I("#008080")) %>% 
+      plotly::layout(title = "Total distance traveled",
+             xaxis = list(title = "Date"),
+             yaxis = list(title = "Total ditance (km)"))
+  })
   
   
 })
