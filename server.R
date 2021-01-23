@@ -1,6 +1,5 @@
 library(shiny)
 library(shiny.semantic)
-library(geosphere)
 library(leaflet)
 library(data.table)
 library(dplyr)
