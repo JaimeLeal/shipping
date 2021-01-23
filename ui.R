@@ -2,9 +2,9 @@ library(shiny)
 library(shiny.semantic)
 
 shinyUI(semanticPage(
-      div(class="ui one column grid container",
-          div(class="row",
-              div(class="ui dividing header", id="input", "Shipping statistcs")),
+      div(class = "ui one column grid container",
+          div(class = "row",
+              div(class = "ui dividing header", id = "input", "Shipping statistcs")),
           div(class = "two column row",
               div(class = "column", 
                   tabset(tabs = list(
@@ -16,12 +16,12 @@ shinyUI(semanticPage(
               div(class = "column", 
                   div(class = "ui card", 
                       div(class = "content",
-                          div(class ="header", "Ship information")),
+                          div(class = "header", "Ship information")),
                       div(class = "content",
                           htmlOutput("card_content")),
                   div(class = "ui teal statistic",
                       div(class = "value", textOutput("distance")),
-                      div(class = "label", "Longest distance (m)")))
+                      div(class = "label", "Longest distance sailed (m)")))
               )
           ),
           div(class = "four column row",

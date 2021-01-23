@@ -35,7 +35,7 @@ shinyServer(function(input, output, session) {
         LON_prev = data.table::shift(LON, n = 1, type = "lag"),
         DATETIME_prev = data.table::shift(DATETIME, n = 1, type = "lag"))]
       # Calculate distance between observations
-      ship_distance <- ship_distance[,DISTANCE := dt_haversine(LAT_prev, LON_prev, LAT, LON)]
+      ship_distance <- ship_distance[, DISTANCE := dt_haversine(LAT_prev, LON_prev, LAT, LON)]
       total_distance <- ship_distance[, .(total_distance = sum(DISTANCE, na.rm = TRUE)),
                                       by = "date"]
       
@@ -99,11 +99,9 @@ shinyServer(function(input, output, session) {
   # Graph
   output$chart <- plotly::renderPlotly({
     fig <- ship_statistics()[[2]] %>% 
-      plotly::plot_ly(x = ~date, y = ~total_distance/1000, type = 'bar', color = I("#008080")) %>% 
+      plotly::plot_ly(x = ~date, y = ~total_distance / 1000, type = "bar", color = I("#008080")) %>% 
       plotly::layout(title = "Total distance traveled",
              xaxis = list(title = "Date"),
              yaxis = list(title = "Total ditance (km)"))
   })
-  
-  
 })
