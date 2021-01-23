@@ -24,10 +24,7 @@ shinyUI(semanticPage(
                       div(class = "label", "Longest distance sailed (m)")))
               )
           ),
-          div(class = "four column row",
-              div(class = "column", selectInput("shiptype", "Select ship type", choices = c("Placeholder"))),
-              div(class = "column", selectInput("shipname", "Select ship name", choices = c("Placeholder")))
-          )
+         dropdown_ui("mod1")
       )
   )
 )

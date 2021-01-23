@@ -1,9 +1,11 @@
+library(shiny)
 library(shiny.semantic)
 library(geosphere)
 library(leaflet)
 library(data.table)
 library(dplyr)
 source("utils.R")
+source("modules/dropdown_module.R")
 
 shinyServer(function(input, output, session) {
   
@@ -13,23 +15,12 @@ shinyServer(function(input, output, session) {
   }, message = "Loading data", value = 0.5)
   
   # Inputs
-  ship_types <- reactive({sort(as.character(unique(ships$ship_type)))})
-  
-  ship_names <- reactive({
-    ships %>% 
-      filter(ship_type == input$shiptype) %>% 
-      pull(SHIPNAME) %>% 
-      unique(.) %>%
-      sort(.)
-  })
-  
-  observe({updateSelectInput(session, "shiptype", choices = ship_types())})
-  observe({updateSelectInput(session, "shipname", choices = ship_names())})
+  dropdown_server("mod1", ships)
   
   # Calculate longest distance by ship
   ship_statistics <- reactive({
     withProgress({
-      ship_distance <- ships[SHIPNAME == input$shipname][order(DATETIME)]
+      ship_distance <- ships[SHIPNAME == input$"mod1-shipname"][order(DATETIME)]
       ship_distance <- ship_distance[, `:=`(
         LAT_prev = data.table::shift(LAT, n = 1, type = "lag"),
         LON_prev = data.table::shift(LON, n = 1, type = "lag"),
