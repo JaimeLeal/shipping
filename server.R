@@ -9,10 +9,16 @@ source("modules/dropdown_module.R")
 
 shinyServer(function(input, output, session) {
   
+  output$load_complete <- renderText(FALSE)
+  
   withProgress({
     # Read data
     ships <- data.table::fread("ships.csv", sep = ",")
+    output$load_complete <- renderText(TRUE)
   }, message = "Loading data", value = 0.5)
+  
+  # Variable to hide/show content
+  outputOptions(output, "load_complete", suspendWhenHidden = FALSE)
   
   # Inputs
   dropdown_server("mod1", ships)
